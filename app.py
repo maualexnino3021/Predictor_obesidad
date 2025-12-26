@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, render_template # <--- CAMBIO 1: Agregado render_template
 from flask_cors import CORS
 import pandas as pd
 import joblib
@@ -38,16 +38,17 @@ def get_risk_category(proba):
     if proba < 0.60: return "moderada"
     return "alta"
 
+# CAMBIO 2: La ruta principal ahora carga tu página web
 @app.route('/', methods=['GET'])
+def home():
+    return render_template('index.html')
+
+# CAMBIO 3: Moví tu JSON de estado aquí por si quieres consultarlo luego
+@app.route('/api/status', methods=['GET'])
 def health():
     return jsonify({
-        "status": "   API de Salud ML - Activa",
+        "status": "API de Salud ML - Activa",
         "version": "2.0",
-        "endpoints": {
-            "predict": "POST - Generar predicción",
-            "health": "GET - Estado del servicio",
-            "models": "GET - Información de modelos"
-        },
         "modelos_cargados": modelo_obesidad is not None
     })
 
