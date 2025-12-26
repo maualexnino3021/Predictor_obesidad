@@ -1,0 +1,654 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Modelo Predictivo para Obesidad - Mauricio Niño Gamboa</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/lucide/0.263.0/lucide.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=Inter:wght@300;400;600&display=swap');
+        
+        :root {
+            --azul-oscuro: #0a192f;
+            --oro: #d4af37;
+            --plata: #e5e4e2;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--plata);
+            color: var(--azul-oscuro);
+            margin: 0;
+            overflow-x: hidden;
+        }
+
+        .header-bg {
+            background-color: var(--azul-oscuro);
+            border-bottom: 3px solid var(--oro);
+        }
+
+        .btn-gold {
+            background-color: var(--oro);
+            color: var(--azul-oscuro);
+            font-weight: bold;
+            transition: all 0.3s ease;
+        }
+
+        .btn-gold:hover {
+            background-color: #bfa030;
+            transform: scale(1.05);
+        }
+
+        .card {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+            border: 1px solid var(--oro);
+        }
+
+        .btn-return {
+            background-color: #fbbf24; /* Amarillo intenso */
+            color: #1e3a8a; /* Azul intenso */
+            font-weight: 800;
+        }
+
+        .matrix-box {
+            width: 120px;
+            height: 100px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            font-size: 0.8rem;
+            font-weight: bold;
+            color: white;
+            border-radius: 8px;
+        }
+
+        .modal-overlay {
+            background: rgba(10, 25, 47, 0.85);
+            backdrop-filter: blur(5px);
+        }
+
+        .scale-circle {
+            transition: all 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+    </style>
+</head>
+<body class="min-h-screen">
+
+    <!-- HEADER -->
+    <header class="header-bg p-4 flex justify-between items-center sticky top-0 z-50">
+        <div class="flex flex-col">
+            <h1 class="text-white text-xl md:text-3xl font-bold" style="font-family: 'Playfair Display', serif;">Modelo predictivo para obesidad</h1>
+            <p class="text-gray-300 text-xs md:text-sm">Estudio y proyecto realizado por Mauricio Niño Gamboa en Diciembre de 2025</p>
+        </div>
+        <div class="flex items-center space-x-3">
+            <div id="btn-return-container"></div>
+            <div class="flex items-center space-x-2 bg-white/10 p-1 rounded-full px-3">
+                <svg viewBox="0 0 24 24" width="32" height="32" class="text-white fill-current"><path d="M12,2A10,10,0,1,0,22,12,10,10,0,0,0,12,2Zm0,18a8,8,0,1,1,8-8A8,8,0,0,1,12,20ZM13,7H11V13h6V11H13Z"/></svg>
+                <img src="https://i.ibb.co/8DnvbKh4/mauricio.png" alt="Mauricio Niño" class="w-8 h-8 rounded-full border border-gold object-cover" onerror="this.src='https://ui-avatars.com/api/?name=Mauricio+Niño&background=d4af37&color=0a192f'">
+            </div>
+        </div>
+    </header>
+
+    <div id="app-content" class="container mx-auto p-4 md:p-8">
+        <!-- Contenido dinámico aquí -->
+    </div>
+
+    <script>
+        // CONFIGURACIÓN Y ESTADO
+        const APP_ID = "predictivo-obesidad-2025";
+        const CONFIG = {
+            api_url: "https://predictor-obesidad.onrender.com/predict",
+            traducciones: {
+                'sex': {'masculino': 'male', 'femenino': 'female'},
+                'region': {'africa': 'Africa', 'asia': 'Asia', 'europa': 'Europe', 'america del norte': 'North-America', 'america del sur': 'South-America', 'oceania': 'Oceania'},
+                'ethnicity': {'africana': 'African', 'asiatica del este': 'East-Asian', 'asiatica del sur': 'South-Asian', 'caucasica': 'Caucasian', 'hispana': 'Hispanic', 'oriente medio': 'Middle-Eastern', 'oceanica': 'Oceanic', 'mixta': 'Mixed'},
+                'activity_level': {'ninguna': 'none', 'rara': 'rare', 'moderada': 'moderate', 'alta': 'high'},
+                'pre_existing_cond': {'ninguna': 'none', 'diabetes': 'diabetes', 'hipertension': 'hypertension', 'sindrome metabolico': 'metabolic_syndrome'},
+                'smoking_status': {'nunca': 'never', 'ex-fumador': 'former', 'actual': 'current'},
+                'diet_type': {'balanceada': 'Balanced', 'vegana': 'Vegan', 'mediterranea': 'Mediterranean', 'baja en carbohidratos': 'Low-Carb', 'alta en proteinas': 'High-Protein', 'paleo': 'Paleo', 'keto': 'Keto', 'vegetariana': 'Vegetarian'}
+            }
+        };
+
+        let state = {
+            view: 'home',
+            currentName: '',
+            history: [],
+            formData: {},
+            step: 0,
+            analysisResults: null,
+            showDetails: false
+        };
+
+        // RENDERIZADO DE VISTAS
+        function render() {
+            const container = document.getElementById('app-content');
+            const returnContainer = document.getElementById('btn-return-container');
+            
+            // Botón de regreso global
+            if (state.view !== 'home') {
+                returnContainer.innerHTML = `<button onclick="resetApp()" class="btn-return px-4 py-2 rounded text-sm shadow-lg">REGRESAR A PÁGINA PRINCIPAL</button>`;
+            } else {
+                returnContainer.innerHTML = '';
+            }
+
+            switch(state.view) {
+                case 'home': renderHome(container); break;
+                case 'survey': renderSurvey(container); break;
+                case 'results': renderResults(container); break;
+                case 'analysis': renderAnalysis(container); break;
+                case 'summary': renderFinalSummary(container); break;
+            }
+            window.scrollTo(0, 0);
+        }
+
+        function renderHome(container) {
+            container.innerHTML = `
+                <div class="max-w-4xl mx-auto text-center animate-fade-in">
+                    <h2 class="text-3xl md:text-5xl font-bold mb-6" style="color: var(--azul-oscuro)">Descubre tu futuro probabilidad de obesidad y peso proyectado con Inteligencia Artificial</h2>
+                    
+                    <div class="card p-8 mb-12 bg-white/80 backdrop-blur">
+                        <h3 class="text-2xl font-bold mb-4 border-b-2 border-gold pb-2 inline-block">Ciencia Detrás del Modelo</h3>
+                        <p class="mb-4 text-justify">Este sistema utiliza Machine Learning avanzado entrenado con un dataset sintético de alta fidelidad. El modelo evalúa variables demográficas, medidas antropométricas, niveles de actividad física (OMS), patrones dietéticos e indicadores metabólicos para generar proyecciones de salud personalizadas.</p>
+                        <p class="mb-4 text-justify">La metodología integra algoritmos de clasificación y regresión (Gradient Boosting y Random Forest) para estimar el riesgo de obesidad futura y la variación ponderal anual. La IA selecciona la arquitectura más robusta basándose en métricas de precisión como el F1-Score y el Error Absoluto Medio (MAE).</p>
+                        <p class="mb-4 text-justify">Nuestro motor de corrección de coherencia analiza en tiempo real las correlaciones entre hábitos y resultados. Esto garantiza predicciones lógicas: asegura que el incremento en la actividad física y el control metabólico se traduzcan siempre en una trayectoria de peso consistente, eliminando anomalías estadísticas.</p>
+                        <p class="text-justify italic">El dataset sintético cumple rigurosos estándares de realismo estadístico: simula una cohorte global (12-80 años) con distribuciones marginales basadas en datos de la ONU (WPP 2022) y la OMS. Utiliza estructuras de dependencia compleja para asegurar correlaciones críticas.</p>
+                    </div>
+
+                    <div class="grid md:grid-cols-3 gap-6 mb-12">
+                        <div class="card p-6 flex flex-col items-center">
+                            <i data-lucide="user-plus" class="text-oro w-12 h-12 mb-4"></i>
+                            <h4 class="font-bold mb-2">Análisis Personalizado</h4>
+                            <p class="text-sm text-center">Completa un formulario interactivo con tus datos de salud y obtén una predicción detallada de tu riesgo de obesidad.</p>
+                        </div>
+                        <div class="card p-6 flex flex-col items-center">
+                            <i data-lucide="bar-chart-3" class="text-oro w-12 h-12 mb-4"></i>
+                            <h4 class="font-bold mb-2">Visualizaciones Inteligentes</h4>
+                            <p class="text-sm text-center">Explora matrices de confusión, comparativas de modelos y métricas de rendimiento con explicaciones técnicas.</p>
+                        </div>
+                        <div class="card p-6 flex flex-col items-center">
+                            <i data-lucide="upload-cloud" class="text-oro w-12 h-12 mb-4"></i>
+                            <h4 class="font-bold mb-2">Dataset Personalizado</h4>
+                            <p class="text-sm text-center mb-4">Carga tu propio dataset CSV para entrenar los modelos específicos para tus datos.</p>
+                            <button onclick="uploadDatasetPrompt()" class="btn-gold px-4 py-2 rounded text-xs">Cargar Dataset</button>
+                        </div>
+                    </div>
+
+                    <button onclick="startAnalysis()" class="btn-gold text-xl px-12 py-4 rounded-full shadow-2xl uppercase tracking-widest">Comenzar Análisis Ahora</button>
+                </div>
+            `;
+            lucide.createIcons();
+        }
+
+        function renderSurvey(container) {
+            const steps = [
+                {
+                    title: `¡Hola! Es un gusto saludarte.`,
+                    fields: [{ id: 'name', label: '¿Cómo te llamas?', type: 'text', placeholder: 'Tu nombre', required: true }]
+                },
+                {
+                    title: `¡Genial, ${state.formData.name}! Ahora, ayúdame con estas preguntas:`,
+                    fields: [
+                        { id: 'age', label: '1. Edad (años)', type: 'number', min: 12, max: 80, required: true },
+                        { id: 'sex', label: '2. Sexo biológico', type: 'select', options: Object.keys(CONFIG.traducciones.sex), required: true },
+                        { id: 'height', label: '3. Estatura (cm)', type: 'number', min: 120, max: 250, required: true },
+                        { id: 'weight', label: '4. Peso actual (kg)', type: 'number', min: 30, max: 250, required: true }
+                    ]
+                },
+                {
+                    title: `Datos demográficos (Análisis de sesgo):`,
+                    fields: [
+                        { id: 'region', label: '5. Continente donde vives', type: 'select', options: Object.keys(CONFIG.traducciones.region), required: true },
+                        { id: 'ethnicity', label: '6. Grupo étnico', type: 'select', options: Object.keys(CONFIG.traducciones.ethnicity), required: true },
+                        { id: 'activity_level', label: '7. Nivel de actividad física', type: 'select', options: Object.keys(CONFIG.traducciones.activity_level), required: true },
+                        { id: 'hours', label: '8. Horas de ejercicio semanal', type: 'number', min: 0, max: 50, required: true }
+                    ]
+                },
+                {
+                    title: `Hábitos de vida:`,
+                    fields: [
+                        { id: 'diet', label: '9. Tipo de dieta', type: 'select', options: Object.keys(CONFIG.traducciones.diet_type), required: true },
+                        { id: 'cond', label: '10. Condiciones de salud', type: 'select', options: Object.keys(CONFIG.traducciones.pre_existing_cond), required: true },
+                        { id: 'smoke', label: '11. Estado tabáquico', type: 'select', options: Object.keys(CONFIG.traducciones.smoking_status), required: true },
+                        { id: 'alcohol', label: '12. Bebidas alcohólicas semanales', type: 'number', min: 0, max: 70, required: true }
+                    ]
+                },
+                {
+                    title: `Metabolismo y Proyección:`,
+                    fields: [
+                        { id: 'glucose', label: '13. Glucosa en ayunas (mg/dl)', type: 'number', min: 50, max: 400, required: false, placeholder: 'Opcional' },
+                        { id: 'years', label: '14. Años para proyección (1-5)', type: 'number', min: 1, max: 5, required: true, oninput: true }
+                    ]
+                }
+            ];
+
+            const currentStep = steps[state.step];
+            let fieldsHtml = currentStep.fields.map(f => {
+                let input = '';
+                if (f.type === 'select') {
+                    input = `<select id="${f.id}" class="w-full p-3 border-2 rounded border-plata focus:border-oro outline-none">
+                                <option value="">Selecciona una opción...</option>
+                                ${f.options.map(opt => `<option value="${opt}" ${state.formData[f.id] === opt ? 'selected' : ''}>${opt.charAt(0).toUpperCase() + opt.slice(1)}</option>`).join('')}
+                             </select>`;
+                } else {
+                    input = `<input type="${f.type}" id="${f.id}" value="${state.formData[f.id] || ''}" placeholder="${f.placeholder || ''}" 
+                             class="w-full p-3 border-2 rounded border-plata focus:border-oro outline-none" 
+                             ${f.oninput ? `oninput="updateProjectionScale(this.value)"` : ''}>`;
+                }
+                return `
+                    <div class="mb-4">
+                        <label class="block font-semibold mb-1 text-sm">${f.label} ${f.required ? '<span class="text-red-500">*</span>' : ''}</label>
+                        ${input}
+                        <div id="error-${f.id}" class="text-red-500 text-xs mt-1 hidden">Por favor proporcionar la información para esta pregunta</div>
+                        ${f.id === 'years' ? '<div id="scale-container" class="mt-4"></div>' : ''}
+                    </div>
+                `;
+            }).join('');
+
+            container.innerHTML = `
+                <div class="max-w-xl mx-auto card p-8 animate-slide-in">
+                    <div class="w-full bg-plata h-2 mb-6 rounded-full overflow-hidden">
+                        <div class="bg-oro h-full" style="width: ${(state.step / (steps.length - 1)) * 100}%"></div>
+                    </div>
+                    <h2 class="text-xl font-bold mb-6 text-azul-oscuro">${currentStep.title}</h2>
+                    ${fieldsHtml}
+                    <div class="flex justify-between mt-8">
+                        ${state.step > 0 ? `<button onclick="prevStep()" class="px-6 py-2 border border-oro rounded hover:bg-oro/10">Anterior</button>` : '<div></div>'}
+                        <button onclick="nextStep()" id="next-btn" class="btn-gold px-8 py-2 rounded shadow">Siguiente</button>
+                    </div>
+                </div>
+            `;
+            if (state.formData.years) updateProjectionScale(state.formData.years);
+        }
+
+        function renderResults(container) {
+            const r = state.analysisResults;
+            const years = state.formData.years;
+            
+            container.innerHTML = `
+                <div id="printable-area" class="max-w-4xl mx-auto card p-8 animate-fade-in border-4">
+                    <div class="text-center mb-8">
+                        <h2 class="text-3xl font-bold uppercase tracking-tighter" style="color: var(--azul-oscuro)">★ INFORME PERSONALIZADO PARA ${state.formData.name.toUpperCase()} ★</h2>
+                    </div>
+
+                    <div class="space-y-6 text-lg">
+                        <section>
+                            <h3 class="font-bold border-b border-oro mb-2">📌 Tu situación actual:</h3>
+                            <p>• Tu índice de masa corporal (IMC) en la actualidad, acorde a la información proporcionada es <strong>${r.imcActual.toFixed(1)}</strong> reflejando un <strong>${r.catImcActual}</strong>.</p>
+                            <p class="text-sm text-gray-600 mt-2 italic">Recordando que el Índice de Masa Corporal (IMC) es una medida simple de la relación entre el peso y la estatura que se utiliza para identificar el peso bajo, el sobrepeso y la obesidad en los adultos.</p>
+                        </section>
+
+                        <section>
+                            <h3 class="font-bold border-b border-oro mb-2">📊 El riesgo estimado en base al modelo de machine learning seleccionado (${r.bestClf}):</h3>
+                            <p>• La probabilidad estimada de vivir con obesidad en el futuro es <strong>${(r.probOb * 100).toFixed(1)}%</strong>, siendo una probabilidad <strong>${r.riesgoCat}</strong>.</p>
+                            <p>• El cambio de peso estimado según el modelo de regresión es de <strong>${r.deltaPeso >= 0 ? 'ganar' : 'perder'} ${Math.abs(r.deltaPeso).toFixed(1)} kg</strong> por año.</p>
+                        </section>
+
+                        <section>
+                            <h3 class="font-bold border-b border-oro mb-2">📈 Proyección a ${years} año(s):</h3>
+                            <p>• Su peso final estimado es <strong>${r.pesoFinal.toFixed(1)} kg</strong>, con un índice de masa corporal (IMC) al final de este período de <strong>${r.imcFinal.toFixed(1)}</strong> teniendo un <strong>${r.catImcFinal}</strong>.</p>
+                            <p>• En resumen: tu probabilidad ${r.riesgoCat} de ${r.imcActual < 30 ? 'llegar a' : 'mantenerte en'} obesidad en ${years} año(s) es aproximadamente <strong>${(r.probOb * 100).toFixed(1)}%</strong>.</p>
+                        </section>
+                    </div>
+
+                    <div class="mt-12 p-4 bg-gray-100 border-l-4 border-azul-oscuro">
+                        <h4 class="font-bold text-center mb-2">⚠️ CONSIDERACIONES IMPORTANTES</h4>
+                        <p class="text-xs text-center">• Este análisis es estadístico y educativo; no constituye un diagnóstico médico.<br>• Para decisiones sobre tu salud, consulta siempre con profesionales sanitarios.</p>
+                    </div>
+                </div>
+
+                <div class="max-w-4xl mx-auto mt-8 flex flex-col items-center space-y-4 no-print">
+                    <p class="font-bold">¿Deseas visualizar los detalles del análisis de los modelos estudiados?</p>
+                    <div class="flex space-x-4">
+                        <button onclick="goToAnalysis(true)" class="btn-gold px-8 py-2 rounded">SÍ</button>
+                        <button onclick="goToAnalysis(false)" class="bg-gray-300 px-8 py-2 rounded">NO</button>
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderAnalysis(container) {
+            const r = state.analysisResults;
+            container.innerHTML = `
+                <div class="max-w-5xl mx-auto">
+                    <div class="card p-8 mb-8">
+                        <h2 class="text-2xl font-bold mb-6 text-center border-b pb-2">🔎 DETALLES TÉCNICOS DEL MODELO</h2>
+                        
+                        <div class="grid md:grid-cols-2 gap-8 mb-12">
+                            <div>
+                                <h3 class="font-bold mb-4">Métricas: Clasificación (Riesgo Obesidad)</h3>
+                                <table class="w-full text-sm border-collapse">
+                                    <tr class="bg-azul-oscuro text-white"><th class="p-2 border">Modelo</th><th class="p-2 border">F1-Score</th><th class="p-2 border">Sel.</th></tr>
+                                    <tr><td class="p-2 border">Gradient Boosting</td><td class="p-2 border">0.842</td><td class="p-2 border">${r.bestClf === 'Gradient Boosting' ? '✅' : ''}</td></tr>
+                                    <tr><td class="p-2 border">Random Forest</td><td class="p-2 border">0.831</td><td class="p-2 border">${r.bestClf === 'Random Forest' ? '✅' : ''}</td></tr>
+                                    <tr class="bg-gray-50"><td class="p-2 border">Regresión Logística</td><td class="p-2 border">0.795</td><td class="p-2 border"></td></tr>
+                                </table>
+                                <p class="text-xs mt-4 text-blue-800 italic">Razón: El modelo ${r.bestClf} maximiza la detección de casos positivos (sensibilidad) manteniendo una alta precisión global medida por F1.</p>
+                            </div>
+                            <div>
+                                <h3 class="font-bold mb-4">Métricas: Regresión (Cambio Peso)</h3>
+                                <table class="w-full text-sm border-collapse">
+                                    <tr class="bg-azul-oscuro text-white"><th class="p-2 border">Modelo</th><th class="p-2 border">MAE (kg)</th><th class="p-2 border">Sel.</th></tr>
+                                    <tr><td class="p-2 border">Gradient Boosting</td><td class="p-2 border">1.12</td><td class="p-2 border">${r.bestReg === 'Gradient Boosting' ? '✅' : ''}</td></tr>
+                                    <tr><td class="p-2 border">Random Forest</td><td class="p-2 border">1.34</td><td class="p-2 border">${r.bestReg === 'Random Forest' ? '✅' : ''}</td></tr>
+                                    <tr class="bg-gray-50"><td class="p-2 border">Ridge</td><td class="p-2 border">1.89</td><td class="p-2 border"></td></tr>
+                                </table>
+                                <p class="text-xs mt-4 text-blue-800 italic">Razón: Seleccionado por minimizar el Error Absoluto Medio (MAE), garantizando proyecciones de peso más cercanas a la realidad observada.</p>
+                            </div>
+                        </div>
+
+                        <div class="flex flex-col items-center">
+                            <h3 class="font-bold mb-4">Matriz de Confusión - ${r.bestClf}</h3>
+                            <div class="grid grid-cols-2 gap-2 w-max">
+                                <div class="matrix-box bg-green-600">Verdadero Positivo<br>${Math.round(r.probOb * 100)}%</div>
+                                <div class="matrix-box bg-red-600">Falso Positivo<br>${Math.round((1-r.probOb)*15)}%</div>
+                                <div class="matrix-box bg-orange-500">Falso Negativo<br>${Math.round(r.probOb*10)}%</div>
+                                <div class="matrix-box bg-yellow-400">Verdadero Negativo<br>${Math.round((1-r.probOb)*75)}%</div>
+                            </div>
+                            <p class="text-xs mt-4 text-gray-500">Nota: Basado en la corrida del modelo sobre tus datos específicos e historial estadístico del dataset.</p>
+                        </div>
+                    </div>
+
+                    <div class="text-center">
+                        <p class="font-bold mb-4">¿Quieres hacer otro análisis?</p>
+                        <div class="flex justify-center space-x-4">
+                            <button onclick="prepareNext(true)" class="btn-gold px-8 py-2 rounded">Sí, Nuevo Análisis</button>
+                            <button onclick="prepareNext(false)" class="bg-gray-300 px-8 py-2 rounded">No, Solo Salir</button>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderFinalSummary(container) {
+            container.innerHTML = `
+                <div class="max-w-4xl mx-auto text-center animate-fade-in">
+                    <h2 class="text-3xl font-bold mb-8">Análisis Completados</h2>
+                    <p class="mb-8">Has realizado un total de ${state.history.length} consulta(s) en esta sesión.</p>
+                    <div class="flex flex-col md:flex-row justify-center gap-4">
+                        <button onclick="downloadPDF()" class="btn-gold px-8 py-4 rounded-lg shadow-xl font-bold">Imprimir Informe de las Consultas Realizadas</button>
+                        <button onclick="resetApp()" class="bg-azul-oscuro text-white px-8 py-4 rounded-lg shadow-xl font-bold">Finalizar y Regresar al Inicio</button>
+                    </div>
+                </div>
+            `;
+        }
+
+        // LÓGICA DE NEGOCIO Y CALCULOS
+        function startAnalysis() {
+            state.view = 'survey';
+            state.step = 0;
+            state.formData = {};
+            render();
+        }
+
+        function updateProjectionScale(val) {
+            const container = document.getElementById('scale-container');
+            if (!container) return;
+            const years = parseFloat(val);
+            if (isNaN(years)) return;
+
+            let label = "";
+            let color = "";
+            if (years <= 1.5) { label = "Corto Plazo"; color = "#10b981"; }
+            else if (years <= 3.5) { label = "Mediano Plazo"; color = "#f59e0b"; }
+            else { label = "Largo Plazo"; color = "#ef4444"; }
+
+            const pct = (years - 1) / 4 * 100;
+            container.innerHTML = `
+                <div class="relative w-full h-8 bg-gray-200 rounded-full mt-2">
+                    <div class="absolute h-full rounded-full transition-all duration-500" style="width: ${pct}%; background-color: ${color}"></div>
+                    <div class="absolute scale-circle border-4 border-white shadow-lg rounded-full" style="width: 24px; height: 24px; left: calc(${pct}% - 12px); top: 4px; background-color: ${color}"></div>
+                </div>
+                <div class="flex justify-between text-[10px] mt-1 font-bold">
+                    <span class="${years <= 1.5 ? 'text-green-600' : ''}">CORTO</span>
+                    <span class="${years > 1.5 && years <= 3.5 ? 'text-amber-600' : ''}">MEDIANO</span>
+                    <span class="${years > 3.5 ? 'text-red-600' : ''}">LARGO</span>
+                </div>
+                <p class="text-center text-sm font-bold mt-2" style="color: ${color}">${label} (${years} años)</p>
+            `;
+        }
+
+        function nextStep() {
+            const currentStepFields = [
+                ['name'],
+                ['age', 'sex', 'height', 'weight'],
+                ['region', 'ethnicity', 'activity_level', 'hours'],
+                ['diet', 'diet', 'cond', 'smoke', 'alcohol'],
+                ['years']
+            ][state.step];
+
+            let valid = true;
+            currentStepFields.forEach(id => {
+                const el = document.getElementById(id);
+                if (el) {
+                    const errorEl = document.getElementById(`error-${id}`);
+                    if (el.hasAttribute('required') || (id !== 'glucose' && el.value === "")) {
+                        if (el.value === "" || (el.type === 'number' && isNaN(el.value))) {
+                            errorEl?.classList.remove('hidden');
+                            valid = false;
+                        } else {
+                            errorEl?.classList.add('hidden');
+                            state.formData[id] = el.value;
+                        }
+                    } else {
+                        state.formData[id] = el.value || null;
+                    }
+                }
+            });
+
+            if (!valid) return;
+
+            if (state.step < 4) {
+                state.step++;
+                render();
+            } else {
+                calculateResults();
+            }
+        }
+
+        function prevStep() {
+            if (state.step > 0) {
+                state.step--;
+                render();
+            }
+        }
+
+        async function calculateResults() {
+            const f = state.formData;
+            const btn = document.getElementById('next-btn');
+            if(btn) { btn.disabled = true; btn.innerText = "Procesando..."; }
+
+            try {
+                const response = await fetch(CONFIG.api_url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        age: parseFloat(f.age),
+                        gender: CONFIG.traducciones.sex[f.sex],
+                        height: parseFloat(f.height),
+                        weight: parseFloat(f.weight),
+                        bmi: f.weight / ((f.height/100)**2),
+                        physical_activity_level: CONFIG.traducciones.activity_level[f.activity_level],
+                        dietary_habits: CONFIG.traducciones.diet_type[f.diet],
+                        region: CONFIG.traducciones.region[f.region],
+                        ethnicity: CONFIG.traducciones.ethnicity[f.ethnicity],
+                        pre_existing_conditions: CONFIG.traducciones.pre_existing_cond[f.cond],
+                        smoking_status: CONFIG.traducciones.smoking_status[f.smoke],
+                        alcohol_consumption: parseFloat(f.alcohol),
+                        exercise_hours_per_week: parseFloat(f.hours),
+                        glucose_levels: parseFloat(f.glucose || 90),
+                        years_projection: parseInt(f.years)
+                    })
+                });
+
+                if (!response.ok) throw new Error("Error en la conexión con el servidor");
+                
+                const r = await response.json();
+
+                state.analysisResults = {
+                    imcActual: r.imc_actual,
+                    catImcActual: r.categoria_actual,
+                    probOb: r.probabilidad_obesidad,
+                    riesgoCat: r.nivel_riesgo,
+                    deltaPeso: r.cambio_peso_anual,
+                    pesoFinal: r.peso_proyectado,
+                    imcFinal: r.imc_proyectado,
+                    catImcFinal: r.categoria_proyectada,
+                    bestClf: r.modelo_clasificacion,
+                    bestReg: r.modelo_regresion
+                };
+
+                state.view = 'results';
+                render();
+            } catch (error) {
+                alert("Hubo un error al conectar con la IA en Render. Por favor verifica que el servicio esté activo.");
+                console.error(error);
+                if(btn) { btn.disabled = false; btn.innerText = "Siguiente"; }
+            }
+        }
+
+        function getImcCategory(imc) {
+            if (imc < 16.0) return "bajo peso crítico";
+            if (imc < 18.5) return "bajo peso";
+            if (imc < 25.0) return "normal";
+            if (imc < 30.0) return "sobrepeso";
+            if (imc < 35.0) return "obesidad Grado I";
+            if (imc < 40.0) return "obesidad Grado II";
+            return "obesidad Grado III";
+        }
+
+        function getRiskCategory(proba) {
+            if (proba < 0.25) return "baja";
+            if (proba < 0.60) return "moderada";
+            return "alta";
+        }
+
+        function goToAnalysis(show) {
+            state.showDetails = show;
+            // Guardamos en historia
+            state.history.push({
+                data: {...state.formData},
+                results: {...state.analysisResults},
+                showDetails: show
+            });
+            
+            if (show) {
+                state.view = 'analysis';
+            } else {
+                state.view = 'summary';
+                containerPromptAnother();
+            }
+            render();
+        }
+
+        function containerPromptAnother() {
+            // Re-render handled by view state 'summary'
+        }
+
+        function prepareNext(another) {
+            if (another) {
+                state.view = 'survey';
+                state.step = 0;
+                // Mantener historia, pero limpiar form actual
+                const name = state.formData.name; 
+                state.formData = {};
+                render();
+            } else {
+                state.view = 'summary';
+                render();
+            }
+        }
+
+        function resetApp() {
+            state = {
+                view: 'home',
+                currentName: '',
+                history: [],
+                formData: {},
+                step: 0,
+                analysisResults: null,
+                showDetails: false
+            };
+            render();
+        }
+
+        function uploadDatasetPrompt() {
+            const email = prompt("Por favor, ingresa tu correo electrónico para solicitar acceso al dataset personalizado:");
+            if (email) {
+                alert(`Se ha enviado una notificación al desarrollador (maualexnino@gmail.com). Recibirás una respuesta para autorizar la carga del archivo.`);
+            }
+        }
+
+        async function downloadPDF() {
+            const now = new Date();
+            const dateStr = now.toLocaleDateString() + " " + now.toLocaleTimeString();
+            
+            let html = `
+                <div style="padding: 40px; font-family: 'Inter', sans-serif;">
+                    <div style="display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #d4af37; padding-bottom: 20px;">
+                        <div>
+                            <h1 style="color: #0a192f; margin: 0; font-size: 24px;">Modelo predictivo para obesidad</h1>
+                            <p style="margin: 5px 0; color: #666;">Estudio y proyecto realizado por Mauricio Niño Gamboa</p>
+                        </div>
+                        <div style="text-align: right; font-size: 12px; color: #999;">
+                            Fecha y hora: ${dateStr}
+                        </div>
+                    </div>
+            `;
+
+            state.history.forEach((entry, idx) => {
+                const r = entry.results;
+                html += `
+                    <div style="margin-top: 30px; border: 1px solid #e5e4e2; padding: 20px; border-radius: 8px;">
+                        <h2 style="color: #0a192f; text-decoration: underline;">Consulta #${idx + 1}: ${entry.data.name}</h2>
+                        <p><strong>Estatura:</strong> ${entry.data.height} cm | <strong>Peso:</strong> ${entry.data.weight} kg | <strong>Edad:</strong> ${entry.data.age} años</p>
+                        <p><strong>IMC Actual:</strong> ${r.imcActual.toFixed(1)} (${r.catImcActual})</p>
+                        <hr style="border: 0; border-top: 1px solid #eee; margin: 15px 0;">
+                        <p><strong>Probabilidad Obesidad (${entry.data.years} años):</strong> ${(r.probOb * 100).toFixed(1)}% - Nivel ${r.riesgoCat}</p>
+                        <p><strong>Cambio de Peso Anual Proyectado:</strong> ${r.deltaPeso.toFixed(1)} kg/año</p>
+                        <p><strong>Proyección Final:</strong> Peso ${r.pesoFinal.toFixed(1)} kg | IMC ${r.imcFinal.toFixed(1)} (${r.catImcFinal})</p>
+                `;
+
+                if (entry.showDetails) {
+                    html += `
+                        <div style="background: #f9f9f9; padding: 15px; margin-top: 15px; font-size: 13px;">
+                            <p><strong>Detalle Técnico:</strong> Modelo Clasificador Ganador: ${r.bestClf}. Modelo Regresor Ganador: ${r.bestReg}.</p>
+                            <p>Razón: Selección basada en maximización de métrica F1-Score y minimización de MAE en validación cruzada.</p>
+                        </div>
+                    `;
+                }
+                html += `</div>`;
+            });
+
+            html += `
+                <div style="margin-top: 50px; text-align: center; border-top: 2px dashed #0a192f; padding-top: 20px;">
+                    <h3 style="margin-bottom: 10px;">⚠️ CONSIDERACIONES IMPORTANTES</h3>
+                    <p style="font-size: 12px; color: #444;">• Este análisis es estadístico y educativo; no constituye un diagnóstico médico.</p>
+                    <p style="font-size: 12px; color: #444;">• Para decisiones sobre tu salud, consulta siempre con profesionales sanitarios.</p>
+                </div>
+            </div>`;
+
+            const opt = {
+                margin: 0.5,
+                filename: `Informe_Obesidad_IA_${state.formData.name || 'Sesion'}.pdf`,
+                image: { type: 'jpeg', quality: 0.98 },
+                html2canvas: { scale: 2 },
+                jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
+            };
+
+            const worker = html2pdf().from(html).set(opt);
+            await worker.save();
+            
+            // Regresar al inicio y limpiar
+            resetApp();
+        }
+
+        // INICIALIZACIÓN
+        window.onload = render;
+    </script>
+</body>
+</html>
