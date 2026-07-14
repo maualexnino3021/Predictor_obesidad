@@ -73,4 +73,4 @@ El sistema utiliza archivos .pkl que contienen modelos previamente entrenados (e
 ⚠️ Descargo de Responsabilidad
 Este software es una herramienta de orientación estadística basada en datos. Los resultados no sustituyen un diagnóstico médico profesional. Siempre consulte a un nutricionista o profesional de la salud antes de realizar cambios drásticos en su dieta o estilo de vida.
 
-Prueba de pull request para n8n.
+...
